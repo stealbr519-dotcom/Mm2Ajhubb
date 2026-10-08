@@ -1,278 +1,262 @@
--- Murder Mystery 2 Script
--- Features: Bomb Jump, ESP, Aimbot
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = Workspace.CurrentCamera
 
--- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MM2Script"
+ScreenGui.Name = "SimpleMM2"
 ScreenGui.Parent = game.CoreGui
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 300)
-MainFrame.Position = UDim2.new(0, 10, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
+-- Button creation function
+local function CreateButton(name, text, position, color)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Size = UDim2.new(0, 100, 0, 40)
+    button.Position = position
+    button.BackgroundColor3 = color or Color3.fromRGB(80, 80, 80)
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextSize = 14
+    button.Font = Enum.Font.SourceSansBold
+    button.BorderSizePixel = 2
+    button.BorderColor3 = Color3.new(1, 1, 1)
+    button.Parent = ScreenGui
+    button.Active = true
+    button.Draggable = false
+    return button
+end
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-Title.Text = "MM2 Script"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextSize = 18
-Title.Font = Enum.Font.SourceSansBold
-Title.Parent = MainFrame
+-- Create buttons
+local ESPButton = CreateButton("ESP", "ESP: OFF", UDim2.new(0, 10, 0, 10), Color3.fromRGB(80, 80, 80))
+local AimbotButton = CreateButton("Aimbot", "Shoot Murderer", UDim2.new(0, 10, 0, 60), Color3.fromRGB(80, 80, 80))
+local BombButton = CreateButton("BombJump", "Bomb: OFF", UDim2.new(0, 10, 0, 110), Color3.fromRGB(80, 80, 80))
+local LockButton = CreateButton("Lock", "Lock", UDim2.new(0, 10, 0, 160), Color3.fromRGB(0, 150, 0))
 
--- ESP Toggle
-local ESPToggle = Instance.new("TextButton")
-ESPToggle.Size = UDim2.new(0.9, 0, 0, 40)
-ESPToggle.Position = UDim2.new(0.05, 0, 0, 40)
-ESPToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-ESPToggle.Text = "ESP: OFF"
-ESPToggle.TextColor3 = Color3.new(1, 1, 1)
-ESPToggle.TextSize = 16
-ESPToggle.Parent = MainFrame
+local buttons = {ESPButton, AimbotButton, BombButton, LockButton}
+local locked = true
+local dragging = nil
+local dragStart = nil
+local startPos = nil
 
--- Aimbot Button
-local AimbotButton = Instance.new("TextButton")
-AimbotButton.Size = UDim2.new(0.9, 0, 0, 40)
-AimbotButton.Position = UDim2.new(0.05, 0, 0, 90)
-AimbotButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-AimbotButton.Text = "AIMBOT (Hold)"
-AimbotButton.TextColor3 = Color3.new(1, 1, 1)
-AimbotButton.TextSize = 16
-AimbotButton.Parent = MainFrame
+-- Dragging system
+for _, button in pairs(buttons) do
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and not locked then
+            dragging = button
+            dragStart = input.Position
+            startPos = button.Position
+        end
+    end)
+end
 
--- Bomb Jump Toggle
-local BombJumpToggle = Instance.new("TextButton")
-BombJumpToggle.Size = UDim2.new(0.9, 0, 0, 40)
-BombJumpToggle.Position = UDim2.new(0.05, 0, 0, 140)
-BombJumpToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-BombJumpToggle.Text = "Bomb Jump: OFF"
-BombJumpToggle.TextColor3 = Color3.new(1, 1, 1)
-BombJumpToggle.TextSize = 16
-BombJumpToggle.Parent = MainFrame
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        dragging.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
 
--- Instructions
-local Info = Instance.new("TextLabel")
-Info.Size = UDim2.new(0.9, 0, 0, 100)
-Info.Position = UDim2.new(0.05, 0, 0, 190)
-Info.BackgroundTransparency = 1
-Info.Text = "ESP: Shows roles\nAimbot: Hold button to aim\nBomb Jump: Jump + Click"
-Info.TextColor3 = Color3.new(1, 1, 1)
-Info.TextSize = 14
-Info.TextWrapped = true
-Info.Parent = MainFrame
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = nil
+    end
+end)
 
--- Variables
+-- Lock/Unlock
+LockButton.MouseButton1Click:Connect(function()
+    locked = not locked
+    LockButton.Text = locked and "Lock" or "Unlock"
+    LockButton.BackgroundColor3 = locked and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+end)
+
+-- ESP System
 local ESPEnabled = false
-local BombJumpEnabled = false
-local ESPObjects = {}
-local IsJumping = false
+local highlights = {}
 
--- ESP Function
-local function GetPlayerRole(player)
-    local character = player.Character
-    if not character then return "Unknown" end
+local function GetRole(player)
+    if player == LocalPlayer then return nil end
+    local char = player.Character
+    if not char then return nil end
     
     local backpack = player:FindFirstChild("Backpack")
-    local knife = character:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
-    local gun = character:FindFirstChild("Gun") or (backpack and backpack:FindFirstChild("Gun"))
+    local hasKnife = char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
+    local hasGun = char:FindFirstChild("Gun") or (backpack and backpack:FindFirstChild("Gun"))
     
-    if knife then return "Murderer", Color3.fromRGB(255, 0, 0) end
-    if gun then return "Sheriff", Color3.fromRGB(0, 0, 255) end
-    return "Innocent", Color3.fromRGB(0, 255, 0)
+    if hasKnife then return "Murderer", Color3.fromRGB(255, 0, 0)
+    elseif hasGun then return "Sheriff", Color3.fromRGB(0, 100, 255)
+    else return "Innocent", Color3.fromRGB(0, 255, 0) end
 end
 
 local function CreateESP(player)
-    if player == LocalPlayer then return end
+    if highlights[player] then return end
     
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "RoleESP"
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "MM2ESP"
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = false
+    highlight.Parent = Workspace
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextStrokeTransparency = 0
-    label.TextSize = 20
-    label.Font = Enum.Font.SourceSansBold
-    label.Parent = billboard
+    highlights[player] = highlight
     
-    ESPObjects[player] = billboard
-    
-    local function Update()
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-            billboard.Enabled = false
+    local function update()
+        if not player.Parent then
+            highlight:Destroy()
+            highlights[player] = nil
             return
         end
         
-        billboard.Adornee = player.Character.HumanoidRootPart
-        local role, color = GetPlayerRole(player)
-        label.Text = player.Name .. " - " .. role
-        label.TextColor3 = color
-        billboard.Enabled = ESPEnabled
+        local char = player.Character
+        if char and ESPEnabled then
+            highlight.Adornee = char
+            local role, color = GetRole(player)
+            if role then
+                highlight.FillColor = color
+                highlight.OutlineColor = color
+                highlight.Enabled = true
+            else
+                highlight.Enabled = false
+            end
+        else
+            highlight.Enabled = false
+        end
     end
     
-    RunService.RenderStepped:Connect(Update)
+    RunService.Heartbeat:Connect(update)
 end
 
--- Initialize ESP for existing players
-for _, player in pairs(Players:GetPlayers()) do
-    CreateESP(player)
-end
-
+for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
 
--- ESP Toggle
-ESPToggle.MouseButton1Click:Connect(function()
+ESPButton.MouseButton1Click:Connect(function()
     ESPEnabled = not ESPEnabled
-    ESPToggle.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
-    ESPToggle.BackgroundColor3 = ESPEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    ESPButton.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
+    ESPButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
--- Bomb Jump (No Teleport - Uses Velocity)
-BombJumpToggle.MouseButton1Click:Connect(function()
-    BombJumpEnabled = not BombJumpEnabled
-    BombJumpToggle.Text = BombJumpEnabled and "Bomb Jump: ON" or "Bomb Jump: OFF"
-    BombJumpToggle.BackgroundColor3 = BombJumpEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
-end)
-
-UserInputService.JumpRequest:Connect(function()
-    IsJumping = true
-    task.wait(0.5)
-    IsJumping = false
-end)
-
-Mouse.Button1Down:Connect(function()
-    if not BombJumpEnabled then return end
-    if not IsJumping then return end
-    
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoidRootPart or not humanoid then return end
-    
-    -- Check if on ground before bomb jumping
-    if humanoid.FloorMaterial ~= Enum.Material.Air then return end
-    
-    -- Calculate bomb jump direction (opposite of look direction, slightly up)
-    local lookVector = Camera.CFrame.LookVector
-    local bombDirection = (-lookVector + Vector3.new(0, 0.8, 0)).Unit
-    
-    -- Apply velocity for bomb jump effect (no teleport!)
-    local bombPower = 120
-    humanoidRootPart.Velocity = bombDirection * bombPower
-    
-    -- Visual effect
-    local explosion = Instance.new("ParticleEmitter")
-    explosion.Texture = "rbxassetid://258128463"
-    explosion.Rate = 100
-    explosion.Lifetime = NumberRange.new(0.5)
-    explosion.Speed = NumberRange.new(10)
-    explosion.Size = NumberSequence.new(2, 0)
-    explosion.Color = ColorSequence.new(Color3.fromRGB(255, 100, 0))
-    explosion.Parent = humanoidRootPart
-    
-    game:GetService("Debris"):AddItem(explosion, 0.5)
-end)
-
--- Aimbot Function
+-- Aimbot - Instant Shoot
 local function GetMurderer()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        local role = GetPlayerRole(player)
-        if role == "Murderer" then
-            return player
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local role = GetRole(p)
+            if role == "Murderer" then return p end
         end
     end
     return nil
 end
 
-local function IsVisible(targetPosition)
-    local origin = Camera.CFrame.Position
-    local direction = (targetPosition - origin)
-    local distance = direction.Magnitude
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    
-    local result = Workspace:Raycast(origin, direction.Unit * distance, raycastParams)
-    
-    return result == nil
-end
-
-local function AimAt(target)
+local function ShootAt(target)
     if not target or not target.Character then return end
-    local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Head")
+    local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
     if not targetPart then return end
     
-    local targetPosition = targetPart.Position
+    -- Aim camera at target
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
     
-    -- Check wall visibility - only aim if visible
-    if not IsVisible(targetPosition) then return end
+    -- Find and activate gun
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local gun = nil
     
-    -- Smooth aim
-    local currentCF = Camera.CFrame
-    local targetCF = CFrame.new(currentCF.Position, targetPosition)
+    if char then gun = char:FindFirstChild("Gun") end
+    if not gun and backpack then gun = backpack:FindFirstChild("Gun") end
     
-    Camera.CFrame = currentCF:Lerp(targetCF, 0.3)
+    if gun then
+        -- Equip gun if in backpack
+        if gun.Parent == backpack then
+            LocalPlayer.Character.Humanoid:EquipTool(gun)
+            task.wait(0.1)
+        end
+        
+        -- Fire the gun (different methods for different MM2 versions)
+        if gun:FindFirstChild("Shoot") then
+            gun.Shoot:FireServer(targetPart.Position)
+        elseif gun:FindFirstChild("Fire") then
+            gun.Fire:FireServer(targetPart.Position)
+        elseif gun:FindFirstChild("Input") then
+            gun.Input:FireServer("Shoot", targetPart.Position)
+        else
+            -- Fallback: click at screen position of target
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            if onScreen then
+                mousemoverel(screenPos.X - Mouse.X, screenPos.Y - Mouse.Y)
+                task.wait(0.05)
+                mouse1click()
+            end
+        end
+    end
 end
 
--- Aimbot Hold Button
-local Aiming = false
-
-AimbotButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        Aiming = true
-        AimbotButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    end
-end)
-
-AimbotButton.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        Aiming = false
-        AimbotButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    end
-end)
-
--- Aimbot Loop
-RunService.RenderStepped:Connect(function()
-    if not Aiming then return end
-    
+AimbotButton.MouseButton1Click:Connect(function()
     local murderer = GetMurderer()
     if murderer then
-        AimAt(murderer)
+        ShootAt(murderer)
+        AimbotButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        task.wait(0.2)
+        AimbotButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    else
+        AimbotButton.Text = "No Murderer"
+        task.wait(1)
+        AimbotButton.Text = "Shoot Murderer"
     end
 end)
 
--- Keybinds
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+-- Bomb Jump - Places Prank Bomb under you when jumping
+local BombEnabled = false
+local hasJumped = false
+
+BombButton.MouseButton1Click:Connect(function()
+    BombEnabled = not BombEnabled
+    BombButton.Text = BombEnabled and "Bomb: ON" or "Bomb: OFF"
+    BombButton.BackgroundColor3 = BombEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(80, 80, 80)
+end)
+
+local function GetPrankBomb()
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local char = LocalPlayer.Character
+    if char then
+        local bomb = char:FindFirstChild("PrankBomb") or char:FindFirstChild("Prank Bomb")
+        if bomb then return bomb end
+    end
+    if backpack then
+        return backpack:FindFirstChild("PrankBomb") or backpack:FindFirstChild("Prank Bomb")
+    end
+    return nil
+end
+
+UserInputService.JumpRequest:Connect(function()
+    if not BombEnabled then return end
     
-    if input.KeyCode == Enum.KeyCode.E then
-        ESPToggle.MouseButton1Click:Fire()
-    elseif input.KeyCode == Enum.KeyCode.Q then
-        BombJumpToggle.MouseButton1Click:Fire()
-    elseif input.KeyCode == Enum.KeyCode.F then
-        -- Toggle aimbot mode
-        Aiming = not Aiming
-        AimbotButton.BackgroundColor3 = Aiming and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    local bomb = GetPrankBomb()
+    local char = LocalPlayer.Character
+    if not bomb or not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Equip bomb if needed
+    if bomb.Parent ~= char then
+        char:FindFirstChild("Humanoid"):EquipTool(bomb)
+        task.wait(0.1)
+    end
+    
+    -- Place bomb under legs
+    task.wait(0.05) -- Small delay to let jump start
+    local bombPos = hrp.Position - Vector3.new(0, 2.5, 0)
+    
+    -- Activate bomb (place it)
+    if bomb:FindFirstChild("Activate") then
+        bomb.Activate:FireServer(bombPos)
+    elseif bomb:FindFirstChild("Throw") then
+        bomb.Throw:FireServer(bombPos)
+    elseif bomb:FindFirstChild("Input") then
+        bomb.Input:FireServer("Place", bombPos)
     end
 end)
 
-print("MM2 Script Loaded!")
-print("Keybinds: E=ESP, Q=Bomb Jump, F=Aimbot Toggle")
+print("Simple MM2 Script Loaded!")
+print("Drag buttons when UNLOCKED, click LOCK to freeze position")
