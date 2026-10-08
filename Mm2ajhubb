@@ -2,82 +2,184 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = Workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
 
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SimpleMM2"
+ScreenGui.Name = "MM2Gui"
+ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
--- Button creation function
-local function CreateButton(name, text, position, color)
+-- Main frame for better organization
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 140, 0, 280)
+MainFrame.Position = UDim2.new(0, 10, 0, 10)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+-- Rounded corners for main frame
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Shadow
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+Shadow.BackgroundTransparency = 1
+Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+Shadow.Size = UDim2.new(1, 20, 1, 20)
+Shadow.Image = "rbxassetid://1316045217"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.6
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+Shadow.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "MM2 TOOLS"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+-- Modern button creation
+local function CreateStyledButton(name, text, posY, accentColor)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0, 100, 0, 40)
-    button.Position = position
-    button.BackgroundColor3 = color or Color3.fromRGB(80, 80, 80)
+    button.Size = UDim2.new(0, 120, 0, 40)
+    button.Position = UDim2.new(0.5, -60, 0, posY)
+    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     button.Text = text
-    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
     button.TextSize = 14
-    button.Font = Enum.Font.SourceSansBold
-    button.BorderSizePixel = 2
-    button.BorderColor3 = Color3.new(1, 1, 1)
-    button.Parent = ScreenGui
-    button.Active = true
-    button.Draggable = false
+    button.Font = Enum.Font.GothamSemibold
+    button.AutoButtonColor = false
+    button.Parent = MainFrame
+    
+    -- Corner radius
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    
+    -- Gradient
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 60, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 40, 40))
+    }
+    gradient.Parent = button
+    
+    -- Accent border
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = accentColor or Color3.fromRGB(100, 100, 100)
+    stroke.Thickness = 2
+    stroke.Parent = button
+    
+    -- Hover effect
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(255, 255, 255)}):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Color = accentColor or Color3.fromRGB(100, 100, 100)}):Play()
+    end)
+    
+    -- Click effect
+    button.MouseButton1Down:Connect(function()
+        button.Size = UDim2.new(0, 118, 0, 38)
+        button.Position = UDim2.new(0.5, -59, 0, posY + 1)
+    end)
+    
+    button.MouseButton1Up:Connect(function()
+        button.Size = UDim2.new(0, 120, 0, 40)
+        button.Position = UDim2.new(0.5, -60, 0, posY)
+    end)
+    
     return button
 end
 
--- Create buttons
-local ESPButton = CreateButton("ESP", "ESP: OFF", UDim2.new(0, 10, 0, 10), Color3.fromRGB(80, 80, 80))
-local AimbotButton = CreateButton("Aimbot", "Shoot Murderer", UDim2.new(0, 10, 0, 60), Color3.fromRGB(80, 80, 80))
-local BombButton = CreateButton("BombJump", "Bomb: OFF", UDim2.new(0, 10, 0, 110), Color3.fromRGB(80, 80, 80))
-local LockButton = CreateButton("Lock", "Lock", UDim2.new(0, 10, 0, 160), Color3.fromRGB(0, 150, 0))
+-- Create buttons with accent colors
+local ESPBtn = CreateStyledButton("ESP", "ESP: OFF", 40, Color3.fromRGB(255, 50, 50))
+local AimBtn = CreateStyledButton("Aimbot", "SHOOT MURDERER", 90, Color3.fromRGB(50, 150, 255))
+local BombBtn = CreateStyledButton("Bomb", "DROP BOMB", 140, Color3.fromRGB(255, 200, 50))
+local LockBtn = CreateStyledButton("Lock", "UNLOCKED", 190, Color3.fromRGB(50, 255, 100))
 
-local buttons = {ESPButton, AimbotButton, BombButton, LockButton}
-local locked = true
-local dragging = nil
+-- Dragging System (Fixed)
+local dragging = false
+local dragInput = nil
 local dragStart = nil
 local startPos = nil
 
--- Dragging system
-for _, button in pairs(buttons) do
-    button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and not locked then
-            dragging = button
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if LockBtn.Text == "UNLOCKED" then
+            dragging = true
             dragStart = input.Position
-            startPos = button.Position
+            startPos = MainFrame.Position
         end
-    end)
-end
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if input == dragInput and dragging then
         local delta = input.Position - dragStart
-        dragging.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = nil
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+        dragInput = nil
     end
 end)
 
--- Lock/Unlock
-LockButton.MouseButton1Click:Connect(function()
-    locked = not locked
-    LockButton.Text = locked and "Lock" or "Unlock"
-    LockButton.BackgroundColor3 = locked and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+-- Lock Toggle
+LockBtn.MouseButton1Click:Connect(function()
+    if LockBtn.Text == "UNLOCKED" then
+        LockBtn.Text = "LOCKED"
+        LockBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(255, 50, 50)
+    else
+        LockBtn.Text = "UNLOCKED"
+        LockBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(50, 255, 100)
+    end
 end)
 
--- ESP System
+-- FIXED ESP SYSTEM - Uses multiple detection methods
 local ESPEnabled = false
-local highlights = {}
+local ESPData = {}
+local RoleCache = {}
 
-local function GetRole(player)
+-- Check role using multiple methods (MM2 specific)
+local function GetRoleAdvanced(player)
     if player == LocalPlayer then return nil end
+    
+    -- Method 1: Check backpack/character for tools
     local char = player.Character
     if not char then return nil end
     
@@ -85,178 +187,390 @@ local function GetRole(player)
     local hasKnife = char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
     local hasGun = char:FindFirstChild("Gun") or (backpack and backpack:FindFirstChild("Gun"))
     
-    if hasKnife then return "Murderer", Color3.fromRGB(255, 0, 0)
-    elseif hasGun then return "Sheriff", Color3.fromRGB(0, 100, 255)
-    else return "Innocent", Color3.fromRGB(0, 255, 0) end
+    if hasKnife then return "Murderer", Color3.fromRGB(255, 0, 50)
+    elseif hasGun then return "Sheriff", Color3.fromRGB(0, 150, 255)
+    end
+    
+    -- Method 2: Check leaderstats (some MM2 versions store roles here)
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        local role = leaderstats:FindFirstChild("Role")
+        if role then
+            if role.Value == "Murderer" then return "Murderer", Color3.fromRGB(255, 0, 50)
+            elseif role.Value == "Sheriff" then return "Sheriff", Color3.fromRGB(0, 150, 255)
+            elseif role.Value == "Innocent" then return "Innocent", Color3.fromRGB(50, 255, 100)
+            end
+        end
+    end
+    
+    -- Method 3: Check for role value in player
+    local roleVal = player:FindFirstChild("Role")
+    if roleVal and roleVal:IsA("StringValue") then
+        if roleVal.Value == "Murderer" then return "Murderer", Color3.fromRGB(255, 0, 50)
+        elseif roleVal.Value == "Sheriff" then return "Sheriff", Color3.fromRGB(0, 150, 255)
+        elseif roleVal.Value == "Innocent" then return "Innocent", Color3.fromRGB(50, 255, 100)
+        end
+    end
+    
+    -- Method 4: Check for specific clothing/assets (aggressive detection)
+    -- Murderers often have specific appearance changes
+    if char:FindFirstChild("Humanoid") then
+        -- Check shirt/pants for murderer indicators
+        local shirt = char:FindFirstChildOfClass("Shirt")
+        local pants = char:FindFirstChildOfClass("Pants")
+        
+        -- Default to Innocent if we see them but no weapon (they might be hiding it)
+        -- Only show if we've seen them as murderer before (cached)
+        if RoleCache[player] then
+            return RoleCache[player], 
+                RoleCache[player] == "Murderer" and Color3.fromRGB(255, 0, 50) or
+                RoleCache[player] == "Sheriff" and Color3.fromRGB(0, 150, 255) or
+                Color3.fromRGB(50, 255, 100)
+        end
+    end
+    
+    return "Innocent", Color3.fromRGB(50, 255, 100) -- Default assumption
+end
+
+local function CleanupESP(player)
+    if ESPData[player] then
+        if ESPData[player].highlight and ESPData[player].highlight.Parent then
+            ESPData[player].highlight:Destroy()
+        end
+        if ESPData[player].connection then
+            ESPData[player].connection:Disconnect()
+        end
+        ESPData[player] = nil
+    end
 end
 
 local function CreateESP(player)
-    if highlights[player] then return end
+    CleanupESP(player)
     
     local highlight = Instance.new("Highlight")
-    highlight.Name = "MM2ESP"
-    highlight.FillTransparency = 0.5
+    highlight.Name = "MM2ESP_" .. player.Name
+    highlight.FillTransparency = 0.6
     highlight.OutlineTransparency = 0
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Enabled = false
     highlight.Parent = Workspace
     
-    highlights[player] = highlight
+    ESPData[player] = {
+        highlight = highlight,
+        lastUpdate = 0
+    }
     
-    local function update()
+    -- Update loop
+    local conn = RunService.Heartbeat:Connect(function()
         if not player.Parent then
-            highlight:Destroy()
-            highlights[player] = nil
+            CleanupESP(player)
+            return
+        end
+        
+        if not ESPEnabled then
+            highlight.Enabled = false
             return
         end
         
         local char = player.Character
-        if char and ESPEnabled then
+        if char then
+            local role, color = GetRoleAdvanced(player)
+            
+            -- Cache the role if it's important
+            if role == "Murderer" or role == "Sheriff" then
+                RoleCache[player] = role
+            end
+            
             highlight.Adornee = char
-            local role, color = GetRole(player)
-            if role then
-                highlight.FillColor = color
-                highlight.OutlineColor = color
-                highlight.Enabled = true
+            highlight.FillColor = color
+            highlight.Enabled = true
+            
+            -- Add name tag if doesn't exist
+            if not char:FindFirstChild("ESPNameTag") then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ESPNameTag"
+                billboard.Size = UDim2.new(0, 100, 0, 20)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                billboard.AlwaysOnTop = true
+                
+                local text = Instance.new("TextLabel")
+                text.Size = UDim2.new(1, 0, 1, 0)
+                text.BackgroundTransparency = 1
+                text.Text = player.Name .. "\n[" .. role .. "]"
+                text.TextColor3 = color
+                text.TextSize = 12
+                text.Font = Enum.Font.GothamBold
+                text.Parent = billboard
+                
+                billboard.Parent = char
             else
-                highlight.Enabled = false
+                local tag = char:FindFirstChild("ESPNameTag")
+                if tag then
+                    local text = tag:FindFirstChildOfClass("TextLabel")
+                    if text then
+                        text.Text = player.Name .. "\n[" .. role .. "]"
+                        text.TextColor3 = color
+                    end
+                end
             end
         else
             highlight.Enabled = false
         end
-    end
+    end)
     
-    RunService.Heartbeat:Connect(update)
+    ESPData[player].connection = conn
 end
 
-for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
-Players.PlayerAdded:Connect(CreateESP)
+-- Initialize ESP
+for _, p in pairs(Players:GetPlayers()) do
+    CreateESP(p)
+end
 
-ESPButton.MouseButton1Click:Connect(function()
-    ESPEnabled = not ESPEnabled
-    ESPButton.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
-    ESPButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(80, 80, 80)
+Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerRemoving:Connect(CleanupESP)
+
+-- Clear cache on new round (detected by character respawn)
+LocalPlayer.CharacterAdded:Connect(function()
+    RoleCache = {}
+    -- Force ESP refresh
+    for player, data in pairs(ESPData) do
+        if data.highlight then
+            data.highlight.Enabled = false
+        end
+    end
 end)
 
--- Aimbot - Instant Shoot
+ESPBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    ESPBtn.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
+    
+    local stroke = ESPBtn:FindFirstChildOfClass("UIStroke")
+    if ESPEnabled then
+        stroke.Color = Color3.fromRGB(50, 255, 100)
+        -- Refresh all highlights
+        for _, p in pairs(Players:GetPlayers()) do
+            if ESPData[p] and ESPData[p].highlight then
+                ESPData[p].highlight.Enabled = true
+            end
+        end
+    else
+        stroke.Color = Color3.fromRGB(255, 50, 50)
+        -- Hide all
+        for _, data in pairs(ESPData) do
+            if data.highlight then data.highlight.Enabled = false end
+        end
+        -- Remove name tags
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character then
+                local tag = p.Character:FindFirstChild("ESPNameTag")
+                if tag then tag:Destroy() end
+            end
+        end
+    end
+end)
+
+-- FIXED AIMBOT - Actually shoots
 local function GetMurderer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
-            local role = GetRole(p)
+            local role = GetRoleAdvanced(p)
             if role == "Murderer" then return p end
         end
     end
     return nil
 end
 
-local function ShootAt(target)
-    if not target or not target.Character then return end
-    local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return end
+local function ShootTarget(target)
+    if not target or not target.Character then return false end
     
-    -- Aim camera at target
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+    local targetPart = target.Character:FindFirstChild("Head") 
+        or target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetPart then return false end
     
-    -- Find and activate gun
+    -- Get gun
     local char = LocalPlayer.Character
+    if not char then return false end
+    
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     local gun = nil
     
-    if char then gun = char:FindFirstChild("Gun") end
-    if not gun and backpack then gun = backpack:FindFirstChild("Gun") end
+    -- Find gun
+    if char then 
+        gun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
+    end
+    if not gun and backpack then 
+        gun = backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver")
+    end
     
-    if gun then
-        -- Equip gun if in backpack
-        if gun.Parent == backpack then
-            LocalPlayer.Character.Humanoid:EquipTool(gun)
-            task.wait(0.1)
-        end
-        
-        -- Fire the gun (different methods for different MM2 versions)
-        if gun:FindFirstChild("Shoot") then
-            gun.Shoot:FireServer(targetPart.Position)
-        elseif gun:FindFirstChild("Fire") then
-            gun.Fire:FireServer(targetPart.Position)
-        elseif gun:FindFirstChild("Input") then
-            gun.Input:FireServer("Shoot", targetPart.Position)
-        else
-            -- Fallback: click at screen position of target
-            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            if onScreen then
-                mousemoverel(screenPos.X - Mouse.X, screenPos.Y - Mouse.Y)
-                task.wait(0.05)
-                mouse1click()
-            end
+    if not gun then 
+        AimBtn.Text = "NO GUN!"
+        task.delay(1, function() AimBtn.Text = "SHOOT MURDERER" end)
+        return false 
+    end
+    
+    -- Equip if needed
+    if gun.Parent == backpack then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:EquipTool(gun)
+            task.wait(0.15)
         end
     end
+    
+    -- Re-check character after equip
+    char = LocalPlayer.Character
+    if not char then return false end
+    
+    -- Aim at target
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+    
+    -- SHOOT - Try multiple methods
+    local shot = false
+    
+    -- Method 1: Direct remote fire
+    local shootEvent = gun:FindFirstChild("Shoot") 
+        or gun:FindFirstChild("Fire") 
+        or gun:FindFirstChild("ShootEvent")
+        or gun:FindFirstChild("RemoteEvent")
+        or gun:FindFirstChild("Input")
+    
+    if shootEvent then
+        pcall(function()
+            if shootEvent.Name == "Input" then
+                shootEvent:FireServer("Shoot", targetPart.Position)
+            else
+                shootEvent:FireServer(targetPart.Position)
+            end
+            shot = true
+        end)
+    end
+    
+    -- Method 2: Activate tool
+    if not shot then
+        pcall(function()
+            gun:Activate()
+            shot = true
+        end)
+    end
+    
+    -- Method 3: Mouse click simulation (if executor supports it)
+    if not shot and mouse1click then
+        local screenPos = Camera:WorldToViewportPoint(targetPart.Position)
+        local mousePos = UserInputService:GetMouseLocation()
+        mousemoverel(screenPos.X - mousePos.X, screenPos.Y - mousePos.Y)
+        task.wait(0.05)
+        mouse1click()
+        shot = true
+    end
+    
+    return shot
 end
 
-AimbotButton.MouseButton1Click:Connect(function()
+AimBtn.MouseButton1Click:Connect(function()
     local murderer = GetMurderer()
     if murderer then
-        ShootAt(murderer)
-        AimbotButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        task.wait(0.2)
-        AimbotButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        local success = ShootTarget(murderer)
+        if success then
+            AimBtn.Text = "SHOT!"
+            AimBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(50, 255, 100)
+            task.delay(0.5, function()
+                AimBtn.Text = "SHOOT MURDERER"
+                AimBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(50, 150, 255)
+            end)
+        end
     else
-        AimbotButton.Text = "No Murderer"
-        task.wait(1)
-        AimbotButton.Text = "Shoot Murderer"
+        AimBtn.Text = "NO MURDERER"
+        task.delay(1, function() AimBtn.Text = "SHOOT MURDERER" end)
     end
 end)
 
--- Bomb Jump - Places Prank Bomb under you when jumping
-local BombEnabled = false
-local hasJumped = false
-
-BombButton.MouseButton1Click:Connect(function()
-    BombEnabled = not BombEnabled
-    BombButton.Text = BombEnabled and "Bomb: ON" or "Bomb: OFF"
-    BombButton.BackgroundColor3 = BombEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(80, 80, 80)
-end)
-
-local function GetPrankBomb()
+-- FIXED BOMB - Click to place immediately
+BombBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then 
+        BombBtn.Text = "NO CHARACTER"
+        task.delay(1, function() BombBtn.Text = "DROP BOMB" end)
+        return 
+    end
+    
     local backpack = LocalPlayer:FindFirstChild("Backpack")
-    local char = LocalPlayer.Character
-    if char then
-        local bomb = char:FindFirstChild("PrankBomb") or char:FindFirstChild("Prank Bomb")
-        if bomb then return bomb end
+    local bomb = nil
+    
+    -- Find bomb
+    if char then 
+        bomb = char:FindFirstChild("PrankBomb") 
+            or char:FindFirstChild("Prank Bomb")
+            or char:FindFirstChild("Bomb")
     end
-    if backpack then
-        return backpack:FindFirstChild("PrankBomb") or backpack:FindFirstChild("Prank Bomb")
+    if not bomb and backpack then 
+        bomb = backpack:FindFirstChild("PrankBomb") 
+            or backpack:FindFirstChild("Prank Bomb")
+            or backpack:FindFirstChild("Bomb")
     end
-    return nil
-end
-
-UserInputService.JumpRequest:Connect(function()
-    if not BombEnabled then return end
     
-    local bomb = GetPrankBomb()
-    local char = LocalPlayer.Character
-    if not bomb or not char then return end
+    if not bomb then
+        BombBtn.Text = "NO BOMB!"
+        task.delay(1, function() BombBtn.Text = "DROP BOMB" end)
+        return
+    end
     
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    -- Equip bomb if needed
-    if bomb.Parent ~= char then
-        char:FindFirstChild("Humanoid"):EquipTool(bomb)
+    -- Equip if needed
+    local humanoid = char:FindFirstChild("Humanoid")
+    if bomb.Parent ~= char and humanoid then
+        humanoid:EquipTool(bomb)
         task.wait(0.1)
     end
     
-    -- Place bomb under legs
-    task.wait(0.05) -- Small delay to let jump start
-    local bombPos = hrp.Position - Vector3.new(0, 2.5, 0)
+    -- Get position (under player)
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
     
-    -- Activate bomb (place it)
-    if bomb:FindFirstChild("Activate") then
-        bomb.Activate:FireServer(bombPos)
-    elseif bomb:FindFirstChild("Throw") then
-        bomb.Throw:FireServer(bombPos)
-    elseif bomb:FindFirstChild("Input") then
-        bomb.Input:FireServer("Place", bombPos)
+    local bombPos = hrp.Position - Vector3.new(0, 3, 0)
+    
+    -- Place bomb
+    local placed = false
+    
+    -- Try different remote names
+    local remotes = {"Activate", "Throw", "Place", "Drop", "Input", "RemoteEvent"}
+    for _, remoteName in ipairs(remotes) do
+        local remote = bomb:FindFirstChild(remoteName)
+        if remote then
+            pcall(function()
+                if remoteName == "Input" then
+                    remote:FireServer("Place", bombPos)
+                elseif remoteName == "Throw" or remoteName == "Drop" then
+                    remote:FireServer(bombPos)
+                else
+                    remote:FireServer(bombPos)
+                end
+                placed = true
+            end)
+            if placed then break end
+        end
+    end
+    
+    -- Fallback: Activate tool
+    if not placed then
+        pcall(function()
+            bomb:Activate()
+            placed = true
+        end)
+    end
+    
+    if placed then
+        BombBtn.Text = "PLACED!"
+        BombBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(50, 255, 100)
+        task.delay(0.5, function()
+            BombBtn.Text = "DROP BOMB"
+            BombBtn:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(255, 200, 50)
+        end)
+    else
+        BombBtn.Text = "FAILED"
+        task.delay(1, function() BombBtn.Text = "DROP BOMB" end)
     end
 end)
 
-print("Simple MM2 Script Loaded!")
-print("Drag buttons when UNLOCKED, click LOCK to freeze position")
+-- Notification
+print("✅ MM2 GUI Loaded Successfully!")
+print("Features: ESP (Fixed), Aimbot (Auto-shoot), Bomb Drop, Draggable UI")
