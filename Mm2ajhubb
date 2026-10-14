@@ -285,6 +285,7 @@ createTab("Player")
 createTab("ESP")
 createTab("Visuals")
 createTab("Combat")
+createTab("AutoFarm")
 selectTab("Player")
 
 local function addSection(tabName, sectionTitle)
@@ -759,7 +760,369 @@ addToggleRow(tabs.Player.frame, "Anti Fling", false, function(v)
 end)
 addSliderRow(tabs.Player.frame, "Anti Fling Sensitivity", 500, 100, 5000, function(v) LINEAR_THRESHOLD = v end)
 
--- ESP TAB
+-- -- ============================================================
+-- AUTO FARM TAB
+-- ============================================================
+addSection("Auto Farm", "Coin Farm")
+
+local farmRunning = false
+local farmResuming = false
+local farmCollectedThisRun = 0
+local farmCollectedCoins = {}
+local FARM_MAX_DIST = 300
+
+local farmStatus = addLabel
+-- (fallback if addLabel doesn't exist in your AJHUB script)
+if not farmStatus then
+    function farmStatus(text, color, parent)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 20)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = color or TEXT
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = parent
+        return lbl
+    end
+end
+
+-- Status rows
+local farmStatusLabel = Instance.new("TextLabel")
+farmStatusLabel.Size = UDim2.new(1, 0, 0, 20)
+farmStatusLabel.BackgroundTransparency = 1
+farmStatusLabel.Text = "Status: ready"
+farmStatusLabel.TextColor3 = TEXT_DIM
+farmStatusLabel.Font = Enum.Font.Gotham
+farmStatusLabel.TextSize = 12
+farmStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+farmStatusLabel.Parent = tabs["Auto Farm"].frame
+
+local farmCoinsLabel = Instance.new("TextLabel")
+farmCoinsLabel.Size = UDim2.new(1, 0, 0, 20)
+farmCoinsLabel.BackgroundTransparency = 1
+farmCoinsLabel.Text = "Coins: reading..."
+farmCoinsLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+farmCoinsLabel.Font = Enum.Font.GothamBold
+farmCoinsLabel.TextSize = 13
+farmCoinsLabel.TextXAlignment = Enum.TextXAlignment.Left
+farmCoinsLabel.Parent = tabs["Auto Farm"].frame
+
+local farmProgressLabel = Instance.new("TextLabel")
+farmProgressLabel.Size = UDim2.new(1, 0, 0, 20)
+farmProgressLabel.BackgroundTransparency = 1
+farmProgressLabel.Text = "Progress: idle"
+farmProgressLabel.TextColor3 = TEXT_DIM
+farmProgressLabel.Font = Enum.Font.Gotham
+farmProgressLabel.TextSize = 12
+farmProgressLabel.TextXAlignment = Enum.TextXAlignment.Left
+farmProgressLabel.Parent = tabs["Auto Farm"].frame
+
+-- Toggle button
+local farmToggleBtn = Instance.new("TextButton")
+farmToggleBtn.Size = UDim2.new(1, 0, 0, 36)
+farmToggleBtn.BackgroundColor3 = ROW
+farmToggleBtn.BorderSizePixel = 0
+farmToggleBtn.Text = "START AUTO FARM"
+farmToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmToggleBtn.Font = Enum.Font.GothamBold
+farmToggleBtn.TextSize = 13
+farmToggleBtn.AutoButtonColor = false
+farmToggleBtn.Parent = tabs["Auto Farm"].frame
+Instance.new("UICorner", farmToggleBtn).CornerRadius = UDim.new(0, 6)
+
+-- Self-kill test button
+local farmKillBtn = Instance.new("TextButton")
+farmKillBtn.Size = UDim2.new(1, 0, 0, 30)
+farmKillBtn.BackgroundColor3 = DANGER
+farmKillBtn.BorderSizePixel = 0
+farmKillBtn.Text = "TEST SELF KILL"
+farmKillBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmKillBtn.Font = Enum.Font.GothamBold
+farmKillBtn.TextSize = 12
+farmKillBtn.AutoButtonColor = false
+farmKillBtn.Parent = tabs["Auto Farm"].frame
+Instance.new("UICorner", farmKillBtn).CornerRadius = UDim.new(0, 6)
+
+-- ============================================================
+-- COIN FARM LOGIC
+-- ============================================================
+local farmFullNotif, farmCoinsText, farmFullIcon, farmEmptyIcon
+
+local function findFarmBagUI()
+    farmFullNotif = nil
+    farmCoinsText = nil
+    farmFullIcon = nil
+    farmEmptyIcon = nil
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return end
+    for _, gui in ipairs(pg:GetChildren()) do
+        if gui:IsA("ScreenGui") then
+            for _, desc in ipairs(gui:GetDescendants()) do
+                if desc:IsA("TextLabel") then
+                    if desc.Name == "FullBagNotification" then
+                        farmFullNotif = desc
+                    elseif desc.Name == "Coins" then
+                        farmCoinsText = desc
+                    end
+                elseif desc:IsA("ImageLabel") then
+                    if desc.Name == "FullBagIcon" then
+                        farmFullIcon = desc
+                    elseif desc.Name == "EmptyBagIcon" then
+                        farmEmptyIcon = desc
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function isFarmBagFull()
+    if not farmFullIcon or not farmFullIcon.Parent then findFarmBagUI() end
+    if farmFullIcon and farmFullIcon.Parent and farmEmptyIcon and farmEmptyIcon.Parent then
+        if farmFullIcon.Visible and not farmEmptyIcon.Visible then
+            return true
+        end
+    end
+    if farmFullNotif and farmFullNotif.Parent then
+        if farmFullNotif.Visible and (farmFullNotif.Text or ""):upper():find("FULL") then
+            return true
+        end
+    end
+    return false
+end
+
+local function readFarmCoins()
+    if not farmCoinsText or not farmCoinsText.Parent then findFarmBagUI() end
+    if farmCoinsText and farmCoinsText.Parent then
+        return farmCoinsText.Text
+    end
+    return "?"
+end
+
+local farmContainer, farmMapName
+
+local function findFarmCoinContainer()
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") or obj:IsA("Folder") then
+            local c = obj:FindFirstChild("CoinContainer")
+            if c then
+                farmContainer = c
+                farmMapName = obj.Name
+                return c
+            end
+        end
+        for _, sub in ipairs(obj:GetChildren()) do
+            if sub:IsA("Model") or sub:IsA("Folder") then
+                local c = sub:FindFirstChild("CoinContainer")
+                if c then
+                    farmContainer = c
+                    farmMapName = sub.Name
+                    return c
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function getFarmCoinPos(coin)
+    if not coin or not coin.Parent then return nil end
+    if coin:IsA("BasePart") then return coin.Position end
+    return nil
+end
+
+local function getFarmNearestDist()
+    local myChar = LocalPlayer.Character
+    if not myChar then return math.huge end
+    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return math.huge end
+    if not farmContainer or not farmContainer.Parent then findFarmCoinContainer() end
+    if not farmContainer then return math.huge end
+    local closest = math.huge
+    for _, coin in ipairs(farmContainer:GetChildren()) do
+        local pos = getFarmCoinPos(coin)
+        if pos then
+            local d = (pos - myHRP.Position).Magnitude
+            if d < closest then closest = d end
+        end
+    end
+    return closest
+end
+
+local function farmGlideTo(coin)
+    local myChar = LocalPlayer.Character
+    if not myChar then return false end
+    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+    local pos = getFarmCoinPos(coin)
+    if not pos then return false end
+    local targetPos = pos + Vector3.new(0, -1.3, 0)
+    local dist = (pos - myHRP.Position).Magnitude
+    local duration = math.clamp(dist / 25, 0.1, 2.0)
+    local targetCFrame = CFrame.new(targetPos) * CFrame.Angles(math.rad(-90), 0, 0)
+    local tw = TweenService:Create(myHRP, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    tw:Play()
+    tw.Completed:Wait()
+    return true
+end
+
+local function farmSelfKill()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    hrp.CFrame = CFrame.new(hrp.Position.X, -1000, hrp.Position.Z)
+end
+
+local function farmLoop()
+    farmStatusLabel.Text = "Status: farming..."
+    while farmRunning do
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then
+            farmStatusLabel.Text = "Status: no character — stopping"
+            farmRunning = false
+            break
+        end
+
+        if isFarmBagFull() then
+            farmStatusLabel.Text = "Status: BAG FULL — resetting"
+            farmRunning = false
+            task.wait(0.15)
+            farmSelfKill()
+            break
+        end
+
+        farmCoinsLabel.Text = "Coins: " .. tostring(readFarmCoins())
+
+        if getFarmNearestDist() > FARM_MAX_DIST then
+            farmStatusLabel.Text = "Status: coins too far — waiting"
+            task.wait(1)
+            continue
+        end
+
+        local coin = nil
+        local nearestD = math.huge
+        local myHRP = char:FindFirstChild("HumanoidRootPart")
+        if farmContainer and myHRP then
+            for _, c in ipairs(farmContainer:GetChildren()) do
+                if getFarmCoinPos(c) and not farmCollectedCoins[c] then
+                    local d = (c.Position - myHRP.Position).Magnitude
+                    if d < nearestD then
+                        nearestD = d
+                        coin = c
+                    end
+                end
+            end
+        end
+
+        if not coin then
+            farmStatusLabel.Text = "Status: all coins done — waiting"
+            task.wait(0.5)
+            continue
+        end
+
+        local before = tonumber(readFarmCoins()) or 0
+        farmStatusLabel.Text = "Status: gliding..."
+        farmGlideTo(coin)
+        task.wait(0.05)
+        farmCollectedCoins[coin] = true
+        local after = tonumber(readFarmCoins()) or 0
+        if after > before then
+            farmCollectedThisRun = farmCollectedThisRun + 1
+            farmProgressLabel.Text = "Progress: collected " .. farmCollectedThisRun
+        end
+        task.wait(0.01)
+    end
+    farmToggleBtn.Text = "START AUTO FARM"
+    farmToggleBtn.BackgroundColor3 = ROW
+end
+
+farmToggleBtn.MouseButton1Click:Connect(function()
+    if farmRunning then
+        farmRunning = false
+        farmResuming = false
+        farmToggleBtn.Text = "START AUTO FARM"
+        farmToggleBtn.BackgroundColor3 = ROW
+        farmStatusLabel.Text = "Status: stopped"
+    else
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then
+            farmStatusLabel.Text = "Status: not spawned yet"
+            return
+        end
+        farmResuming = true
+        farmRunning = true
+        farmCollectedThisRun = 0
+        farmCollectedCoins = {}
+        farmToggleBtn.Text = "STOP AUTO FARM"
+        farmToggleBtn.BackgroundColor3 = ACCENT_DIM
+        farmStatusLabel.Text = "Status: farming..."
+        findFarmBagUI()
+        findFarmCoinContainer()
+        task.spawn(farmLoop)
+    end
+end)
+
+farmKillBtn.MouseButton1Click:Connect(function()
+    farmStatusLabel.Text = "Status: testing self-kill..."
+    farmSelfKill()
+end)
+
+LocalPlayer.CharacterRemoving:Connect(function()
+    farmRunning = false
+    farmStatusLabel.Text = "Status: died — farm paused"
+    farmToggleBtn.Text = "START AUTO FARM"
+    farmToggleBtn.BackgroundColor3 = ROW
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    farmFullNotif = nil
+    farmCoinsText = nil
+    farmFullIcon = nil
+    farmEmptyIcon = nil
+    farmContainer = nil
+    farmCollectedCoins = {}
+    farmRunning = false
+    task.wait(1)
+    findFarmBagUI()
+
+    if not farmResuming then
+        farmStatusLabel.Text = "Status: respawned (farm off)"
+        return
+    end
+
+    farmStatusLabel.Text = "Status: waiting for new round..."
+    local waited = 0
+    local ready = false
+    while waited < 120 do
+        task.wait(1)
+        waited = waited + 1
+        if farmRunning then return end
+        if not farmResuming then return end
+        local char = LocalPlayer.Character
+        local hasChar = char and char:FindFirstChild("HumanoidRootPart")
+        if hasChar and getFarmNearestDist() < FARM_MAX_DIST then
+            ready = true
+            break
+        end
+    end
+
+    if ready then
+        farmStatusLabel.Text = "Status: new round — resuming"
+        farmCollectedThisRun = 0
+        farmCollectedCoins = {}
+        farmRunning = true
+        farmToggleBtn.Text = "STOP AUTO FARM"
+        farmToggleBtn.BackgroundColor3 = ACCENT_DIM
+        task.spawn(farmLoop)
+    else
+        farmStatusLabel.Text = "Status: no round started"
+    end
+end)
+
+ESP TAB
 addSection("ESP", "ESP")
 
 local ESPEnabled = true
