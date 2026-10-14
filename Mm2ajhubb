@@ -702,7 +702,7 @@ end)()
 
 print("✅ Part 1 of 2 loaded — Venyx library ready")
 -- ============================================================
--- AJHUB — Part 2 of 2 (the hub itself)
+-- AJHUB — Part 2 of 2 (drag + minimize fixed)
 -- Paste this directly below Part 1 (Venyx library)
 -- ============================================================
 
@@ -727,53 +727,32 @@ local UI = Venyx.new({
 })
 
 -- ============================================================
--- DRAG PATCH + MINIMIZE SQUARE
+-- DRAG PATCH + MINIMIZE + RESTORE
 -- ============================================================
 task.spawn(function()
-    for i = 1, 30 do
+    for i = 1, 40 do
         task.wait(0.2)
         local g
         for _, s in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-            if s:IsA("ScreenGui") then
-                for _, d in ipairs(s:GetDescendants()) do
-                    if d:IsA("TextLabel") and d.Text and d.Text:find("AJHUB") then
-                        g = s; break
-                    end
-                end
-            end
-            if g then break end
+            if s:IsA("ScreenGui") and s.Name == "AJHUB" then g = s; break end
         end
         if g then
-            local mainFrame, bestArea = nil, 0
-            for _, c in ipairs(g:GetChildren()) do
-                if c:IsA("Frame") then
-                    local area = c.AbsoluteSize.X * c.AbsoluteSize.Y
-                    if area > bestArea then bestArea = area; mainFrame = c end
-                end
-            end
-            if not mainFrame then return end
+            local main = g:FindFirstChild("Main")
+            if not main then return end
+            local topbar = main:FindFirstChild("TopBar")
+            if not topbar then return end
 
-            local handle, bestScore = mainFrame, 0
-            for _, c in ipairs(mainFrame:GetDescendants()) do
-                if c:IsA("Frame") or c:IsA("TextButton") then
-                    local s = c.AbsoluteSize
-                    if s.X > 100 and s.Y > 15 and s.Y < 60 then
-                        local score = s.X / math.max(s.Y, 1)
-                        if score > bestScore then bestScore = score; handle = c end
-                    end
-                end
-            end
-
+            -- Make the ENTIRE topbar a drag handle
             local dragging, dragStart, startPos, dragInput
-            handle.InputBegan:Connect(function(input)
+            topbar.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1
                 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = true
                     dragStart = input.Position
-                    startPos = mainFrame.Position
+                    startPos = main.Position
                 end
             end)
-            handle.InputChanged:Connect(function(input)
+            topbar.InputChanged:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseMovement
                 or input.UserInputType == Enum.UserInputType.Touch then
                     dragInput = input
@@ -782,7 +761,7 @@ task.spawn(function()
             UIS.InputChanged:Connect(function(input)
                 if input == dragInput and dragging then
                     local delta = input.Position - dragStart
-                    mainFrame.Position = UDim2.new(
+                    main.Position = UDim2.new(
                         startPos.X.Scale, startPos.X.Offset + delta.X,
                         startPos.Y.Scale, startPos.Y.Offset + delta.Y
                     )
@@ -796,6 +775,24 @@ task.spawn(function()
                 end
             end)
 
+            -- Add minimize button to the topbar
+            local minBtn = Instance.new("TextButton")
+            minBtn.Name = "AJHUBMinimize"
+            minBtn.Size = UDim2.new(0, 26, 0, 26)
+            minBtn.Position = UDim2.new(1, -32, 0.5, -13)
+            minBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            minBtn.BackgroundTransparency = 0.2
+            minBtn.BorderSizePixel = 0
+            minBtn.Text = "—"
+            minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            minBtn.Font = Enum.Font.GothamBold
+            minBtn.TextSize = 16
+            minBtn.AutoButtonColor = false
+            minBtn.ZIndex = 10
+            minBtn.Parent = topbar
+            Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+            -- Restore square
             local restoreGui = Instance.new("ScreenGui")
             restoreGui.Name = "AJHUB_Restore"
             restoreGui.ResetOnSpawn = false
@@ -816,16 +813,24 @@ task.spawn(function()
             rbtn.Parent = restoreGui
             Instance.new("UICorner", rbtn).CornerRadius = UDim.new(0, 10)
 
+            minBtn.MouseButton1Click:Connect(function()
+                main.Visible = false
+                rbtn.Visible = true
+            end)
             rbtn.MouseButton1Click:Connect(function()
-                mainFrame.Visible = true
+                main.Visible = true
                 rbtn.Visible = false
             end)
 
             task.spawn(function()
                 while true do
                     task.wait(0.2)
-                    if mainFrame and mainFrame.Parent then
-                        rbtn.Visible = not mainFrame.Visible
+                    if main and main.Parent then
+                        if main.Visible then
+                            rbtn.Visible = false
+                        else
+                            rbtn.Visible = true
+                        end
                     end
                 end
             end)
@@ -1627,7 +1632,7 @@ local function grabGun()
     return true
 end
 
--- Steal Gun toggle: flings sheriff, then grabs gun
+-- Steal Gun toggle
 StealSection:addToggle({
     title = "Steal Gun (spawns STEAL button)",
     callback = function(v)
@@ -1651,7 +1656,7 @@ StealSection:addToggle({
     end
 })
 
--- Pick Up Gun toggle: just grabs the dropped gun
+-- Pick Up Gun toggle
 StealSection:addToggle({
     title = "Pick Up Gun (spawns PICK button)",
     callback = function(v)
@@ -1667,7 +1672,7 @@ StealSection:addToggle({
     end
 })
 
--- Auto Pick Up Gun toggle: NO floating button, just loops internally
+-- Auto Pick Up Gun toggle (no button)
 local autoPickupEnabled = false
 local autoPickupThread = nil
 
@@ -1715,13 +1720,11 @@ StealSection:addToggle({
     end
 })
 
--- Lock floating buttons toggle
+-- Lock floating buttons
 local LockSection = MiscPage:addSection({ title = "Lock Buttons" })
 LockSection:addToggle({
     title = "Lock Floating Buttons",
-    callback = function(v)
-        floatsLocked = v
-    end
+    callback = function(v) floatsLocked = v end
 })
 
 print("✅ AJHUB loaded — all tabs ready")
